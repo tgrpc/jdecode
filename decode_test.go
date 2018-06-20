@@ -174,6 +174,50 @@ func TestDecode(t *testing.T) {
 
 }
 
+func TestDecodeRange(t *testing.T) {
+	t.Run("Decode $range2", func(t *testing.T) {
+		tcases := []testcase{
+			// {
+			// 	raw: `{"vals":["@vals,$range"]}`,
+			// 	bs:  []byte(`{"vals":[{"i1":100},{"i2":101}]}`),
+			// 	des: []string{`{"vals":[{"i1":100}]}`, `{"vals":[{"i2":101}]}`},
+			// },
+			// {
+			// 	raw: `{"name":"@$range"}`,
+			// 	bs:  []byte(`["1","2","3"]`),
+			// 	des: []string{`{"name":"1"}`, `{"name":"2"}`, `{"name":"3"}`},
+			// },
+			// {
+			// 	raw: `{"val":"@vals,$range"}`,
+			// 	bs:  []byte(`{"vals":[1,2,3]}`),
+			// 	des: []string{`{"val":1}`, `{"val":2}`, `{"val":3}`},
+			// },
+			// {
+			// 	raw: `{"val":"@vals,$range","val2":"@vals,$range"}`,
+			// 	bs:  []byte(`{"vals":[1,2,3]}`),
+			// 	des: []string{`{"val":1,"val2":"@vals,$range"}`, `{"val":2,"val2":"@vals,$range"}`, `{"val":3,"val2":"@vals,$range"}`},
+			// },
+			{
+				raw: `{"val":"@$range,name"}`,
+				bs:  []byte(`[{"name":"katasi"},{"name":"katasiki"},{"name":"kataji"}]`),
+				des: []string{`{"val":"katasi"}`, `{"val":"katasiki"}`, `{"val":"kataji"}`},
+			},
+		}
+		size := len(tcases)
+		for i := 0; i < size; i++ {
+			des, _ := Decode(tcases[i].raw, tcases[i].bs)
+			if !reflect.DeepEqual(des, tcases[i].des) {
+				// if !strings.EqualFold(des, tcases[i].des) {
+				t.Errorf("decode: %s, want: %s, got: %s", tcases[i].raw, tcases[i].des, des)
+			} else {
+				for j, it := range des {
+					log.Debugf("%d decode, raw: %s bs: %s ==> %s", j, tcases[i].raw, tcases[i].bs, it)
+				}
+			}
+		}
+	})
+}
+
 func TestGetLetterStr(t *testing.T) {
 	t.Run("getLetterStr", func(t *testing.T) {
 		ts := [][2]string{
