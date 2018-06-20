@@ -206,6 +206,9 @@ func value(v interface{}) (string, string) {
 
 // 返回符合jsnm ArrGet的路径，以@开头,以#结尾
 func getLetterStr(bs []byte) (string, bool) {
+	if len(bs) <= 0 {
+		return "", false
+	}
 	if bs[0] != at {
 		return "", false
 	}
