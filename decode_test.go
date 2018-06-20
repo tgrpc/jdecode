@@ -134,8 +134,87 @@ func TestDecode(t *testing.T) {
 			}
 		}
 	})
+}
 
-	t.Run("Decode $range", func(t *testing.T) {
+func TestTrimPath(t *testing.T) {
+	type tPath struct {
+		raw  []string
+		want RangePath
+	}
+
+	tcases := []*tPath{
+		&tPath{
+			raw: []string{""},
+			want: RangePath{
+				prefixPaths: []string{""},
+				suffixPaths: nil,
+			},
+		},
+		&tPath{
+			raw: []string{"$range"},
+			want: RangePath{
+				prefixPaths: []string{},
+				suffixPaths: []string{},
+				ranged:      true,
+			},
+		},
+		&tPath{
+			raw: []string{"vals", "$range"},
+			want: RangePath{
+				prefixPaths: []string{"vals"},
+				suffixPaths: []string{},
+				ranged:      true,
+			},
+		},
+		&tPath{
+			raw: []string{"version", "vals", "$range"},
+			want: RangePath{
+				prefixPaths: []string{"version", "vals"},
+				suffixPaths: []string{},
+				ranged:      true,
+			},
+		},
+		&tPath{
+			raw: []string{"$range", "val"},
+			want: RangePath{
+				prefixPaths: []string{},
+				suffixPaths: []string{"val"},
+				ranged:      true,
+			},
+		},
+		&tPath{
+			raw: []string{"$range", "val", "i64"},
+			want: RangePath{
+				prefixPaths: []string{},
+				suffixPaths: []string{"val", "i64"},
+				ranged:      true,
+			},
+		},
+		&tPath{
+			raw: []string{"version", "vals", "$range", "val", "i64"},
+			want: RangePath{
+				prefixPaths: []string{"version", "vals"},
+				suffixPaths: []string{"val", "i64"},
+				ranged:      true,
+			},
+		},
+	}
+
+	size := len(tcases)
+	for i := 0; i < size; i++ {
+		got := TrimPath(tcases[i].raw)
+		if got.ranged != tcases[i].want.ranged ||
+			!reflect.DeepEqual(got.prefixPaths, tcases[i].want.prefixPaths) ||
+			!reflect.DeepEqual(got.suffixPaths, tcases[i].want.suffixPaths) {
+			t.Errorf("TrimPath: %+v, want: %+v (%d-%d), got: %+v (%d-%d)", tcases[i].raw, tcases[i].want, len(tcases[i].want.prefixPaths), len(tcases[i].want.suffixPaths), got, len(got.prefixPaths), len(got.suffixPaths))
+		} else {
+			log.Debugf("%d TrimPath, raw: %+v ==> %+v", i, tcases[i].raw, got)
+		}
+	}
+}
+
+func TestDecodeRange(t *testing.T) {
+	t.Run("Decode $range2", func(t *testing.T) {
 		tcases := []testcase{
 			{
 				raw: `{"vals":["@vals,$range"]}`,
@@ -157,46 +236,6 @@ func TestDecode(t *testing.T) {
 				bs:  []byte(`{"vals":[1,2,3]}`),
 				des: []string{`{"val":1,"val2":"@vals,$range"}`, `{"val":2,"val2":"@vals,$range"}`, `{"val":3,"val2":"@vals,$range"}`},
 			},
-		}
-		size := len(tcases)
-		for i := 0; i < size; i++ {
-			des, _ := Decode(tcases[i].raw, tcases[i].bs)
-			if !reflect.DeepEqual(des, tcases[i].des) {
-				// if !strings.EqualFold(des, tcases[i].des) {
-				t.Errorf("decode: %s, want: %s, got: %s", tcases[i].raw, tcases[i].des, des)
-			} else {
-				for j, it := range des {
-					log.Debugf("%d decode, raw: %s bs: %s ==> %s", j, tcases[i].raw, tcases[i].bs, it)
-				}
-			}
-		}
-	})
-
-}
-
-func TestDecodeRange(t *testing.T) {
-	t.Run("Decode $range2", func(t *testing.T) {
-		tcases := []testcase{
-			// {
-			// 	raw: `{"vals":["@vals,$range"]}`,
-			// 	bs:  []byte(`{"vals":[{"i1":100},{"i2":101}]}`),
-			// 	des: []string{`{"vals":[{"i1":100}]}`, `{"vals":[{"i2":101}]}`},
-			// },
-			// {
-			// 	raw: `{"name":"@$range"}`,
-			// 	bs:  []byte(`["1","2","3"]`),
-			// 	des: []string{`{"name":"1"}`, `{"name":"2"}`, `{"name":"3"}`},
-			// },
-			// {
-			// 	raw: `{"val":"@vals,$range"}`,
-			// 	bs:  []byte(`{"vals":[1,2,3]}`),
-			// 	des: []string{`{"val":1}`, `{"val":2}`, `{"val":3}`},
-			// },
-			// {
-			// 	raw: `{"val":"@vals,$range","val2":"@vals,$range"}`,
-			// 	bs:  []byte(`{"vals":[1,2,3]}`),
-			// 	des: []string{`{"val":1,"val2":"@vals,$range"}`, `{"val":2,"val2":"@vals,$range"}`, `{"val":3,"val2":"@vals,$range"}`},
-			// },
 			{
 				raw: `{"val":"@$range,name"}`,
 				bs:  []byte(`[{"name":"katasi"},{"name":"katasiki"},{"name":"kataji"}]`),
@@ -207,7 +246,6 @@ func TestDecodeRange(t *testing.T) {
 		for i := 0; i < size; i++ {
 			des, _ := Decode(tcases[i].raw, tcases[i].bs)
 			if !reflect.DeepEqual(des, tcases[i].des) {
-				// if !strings.EqualFold(des, tcases[i].des) {
 				t.Errorf("decode: %s, want: %s, got: %s", tcases[i].raw, tcases[i].des, des)
 			} else {
 				for j, it := range des {

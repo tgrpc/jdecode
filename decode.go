@@ -43,7 +43,12 @@ func jsonen(i interface{}) ([]byte, error) {
 	return json.Marshal(i)
 }
 
-func TrimPath(paths []string) []string {
+type RangePath struct {
+	prefixPaths, suffixPaths []string
+	ranged                   bool // 是否循环
+}
+
+func TrimPath(paths []string) RangePath {
 	ret := make([]string, len(paths))
 	for i, it := range paths {
 		if len(it) <= 0 {
@@ -51,11 +56,19 @@ func TrimPath(paths []string) []string {
 		} else {
 			ret[i] = it
 		}
+	}
+
+	for i, it := range paths {
 		if it == ranger {
-			return ret[:i]
+			return RangePath{
+				prefixPaths: ret[:i],
+				suffixPaths: ret[i+1:],
+				ranged:      true,
+			}
 		}
 	}
-	return ret
+
+	return RangePath{prefixPaths: ret}
 }
 
 func decodeRange(js *jsnm.Jsnm, raw, pathStr string) ([]string, string) {
@@ -91,27 +104,27 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 	}
 	for _, it := range allpaths {
 		rawpaths := strings.Split(it, ",")
-		paths := TrimPath(rawpaths)
+		rangePaths := TrimPath(rawpaths)
 		size := len(rawpaths)
 		if size <= 0 {
 			continue
 		}
-		rawArrGet := js.ArrGet(paths...)
+		rawArrGet := js.ArrGet(rangePaths.prefixPaths...)
 		val := rawArrGet.RawData().Raw()
 		if val == nil {
 			continue
 		}
-		if rawpaths[size-1] == ranger {
+		if rangePaths.ranged {
 			arr := rawArrGet.Arr()
 			retsize := len(arr)
 			ret := make([]string, retsize)
 			for i, item := range arr {
 				var v string
-				bs, err := jsonen(item.RawData().Raw())
+				bs, err := jsonen(item.ArrGet(rangePaths.suffixPaths...).RawData().Raw())
 				if err == nil {
 					v = string(bs)
 				} else {
-					v = fmt.Sprint(item.RawData().Raw())
+					v = fmt.Sprint(item.ArrGet(rangePaths.suffixPaths...).RawData().Raw())
 				}
 
 				ret[i] = strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), v, 1)
