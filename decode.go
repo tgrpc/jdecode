@@ -20,6 +20,7 @@ var (
 	dblquot = rune(`"`[0])
 	dollar  = rune(`$`[0])
 	ranger  = "$range"
+	step    = "$step"
 
 	log *logrus.Entry
 )
@@ -45,7 +46,7 @@ func jsonen(i interface{}) ([]byte, error) {
 
 type RangePath struct {
 	prefixPaths, suffixPaths []string
-	ranged                   bool // 是否循环
+	ranged, step             bool // 是否循环, 是否range-step
 }
 
 func TrimPath(paths []string) RangePath {
@@ -64,6 +65,12 @@ func TrimPath(paths []string) RangePath {
 				prefixPaths: ret[:i],
 				suffixPaths: ret[i+1:],
 				ranged:      true,
+			}
+		} else if it == step {
+			return RangePath{
+				prefixPaths: ret[:i],
+				suffixPaths: ret[i+1:],
+				step:        true,
 			}
 		}
 	}
@@ -128,6 +135,20 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 				}
 
 				ret[i] = strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), v, 1)
+			}
+			return ret, it
+		}
+		if rangePaths.step {
+			arr := rawArrGet.Arr()
+			retsize := len(arr)
+			if retsize < 2 {
+				return []string{}, ""
+			}
+			from := arr[0].MustInt64()
+			to := arr[1].MustInt64()
+			ret := make([]string, 0, int(to-from))
+			for i := from; i < to; i++ {
+				ret = append(ret, strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf("%d", i), 1))
 			}
 			return ret, it
 		}
