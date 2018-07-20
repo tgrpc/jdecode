@@ -144,8 +144,8 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			if retsize < 2 {
 				return []string{}, ""
 			}
-			from := arr[0].MustInt64()
-			to := arr[1].MustInt64()
+			from := int32(arr[0].MustFloat64())
+			to := int32(arr[1].MustFloat64())
 			ret := make([]string, 0, int(to-from))
 			for i := from; i < to; i++ {
 				ret = append(ret, strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf("%d", i), 1))

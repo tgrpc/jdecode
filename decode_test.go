@@ -257,7 +257,7 @@ func TestDecodeRange(t *testing.T) {
 }
 
 func TestDecodeStep(t *testing.T) {
-	t.Run("Decode $range2", func(t *testing.T) {
+	t.Run("Decode $step", func(t *testing.T) {
 		tcases := []testcase{
 			{
 				raw: `{"name":"@$step"}`,
