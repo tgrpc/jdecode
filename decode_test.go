@@ -111,6 +111,21 @@ func TestDecodeAt(t *testing.T) {
 	})
 }
 
+func TestDecodeEz(t *testing.T) {
+	// tcase := testcase{
+	// 	raw: `{"activityId":"5be03085564db86fec4c52b4","gpids":"@data"}`,
+	// 	bs:  []byte(`{"data":["20413995","20413637"]}`),
+	// 	des: []string{`"{"activityId":"5be03085564db86fec4c52b4","gpids":["20413995","20413637"]}`},
+	// }
+	// des, _ := Decode(tcase.raw, tcase.bs)
+	// if !reflect.DeepEqual(des, tcase.des) {
+	// 	// if !strings.EqualFold(des, tcase.des) {
+	// 	t.Errorf("decode: %s, want: %s, got: %s", tcase.raw, tcase.des, des)
+	// } else {
+	// 	log.Debugf("decode, raw: %s bs: %s ==> %s", tcase.raw, tcase.bs, des)
+	// }
+}
+
 func TestDecode(t *testing.T) {
 	t.Run("Decode-Nil", func(t *testing.T) {
 		des, _ := Decode(tcases[0].raw, tcases[0].bs)
@@ -262,7 +277,30 @@ func TestDecodeStep(t *testing.T) {
 			{
 				raw: `{"name":"@$step"}`,
 				bs:  []byte(`["1","4"]`),
-				des: []string{`{"name":"1"}`, `{"name":"2"}`, `{"name":"3"}`},
+				des: []string{`{"name":1}`, `{"name":2}`, `{"name":3}`},
+			},
+		}
+		size := len(tcases)
+		for i := 0; i < size; i++ {
+			des, _ := Decode(tcases[i].raw, tcases[i].bs)
+			if !reflect.DeepEqual(des, tcases[i].des) {
+				t.Errorf("decode: %s, want: %s, got: %s", tcases[i].raw, tcases[i].des, des)
+			} else {
+				for j, it := range des {
+					log.Debugf("%d decode, raw: %s bs: %s ==> %s", j, tcases[i].raw, tcases[i].bs, it)
+				}
+			}
+		}
+	})
+}
+
+func TestDecodeSlice(t *testing.T) {
+	t.Run("Decode $slice", func(t *testing.T) {
+		tcases := []testcase{
+			{
+				raw: `{"name":"@$slice"}`,
+				bs:  []byte(`[3,2,6]`),
+				des: []string{`{"name":3}`, `{"name":5}`},
 			},
 		}
 		size := len(tcases)

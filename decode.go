@@ -21,6 +21,7 @@ var (
 	dollar  = rune(`$`[0])
 	ranger  = "$range"
 	step    = "$step"
+	slice   = "$slice"
 
 	log *logrus.Entry
 )
@@ -46,7 +47,7 @@ func jsonen(i interface{}) ([]byte, error) {
 
 type RangePath struct {
 	prefixPaths, suffixPaths []string
-	ranged, step             bool // 是否循环, 是否range-step
+	ranged, step, slice      bool // 是否循环, 是否range-step, slice切片
 }
 
 func TrimPath(paths []string) RangePath {
@@ -71,6 +72,12 @@ func TrimPath(paths []string) RangePath {
 				prefixPaths: ret[:i],
 				suffixPaths: ret[i+1:],
 				step:        true,
+			}
+		} else if it == slice {
+			return RangePath{
+				prefixPaths: ret[:i],
+				suffixPaths: ret[i+1:],
+				slice:       true,
 			}
 		}
 	}
@@ -99,13 +106,31 @@ func decodeRange(js *jsnm.Jsnm, raw, pathStr string) ([]string, string) {
 	return ret, pathStr
 }
 
+func DecodeDataFile(raw string) string {
+	if !strings.HasPrefix(raw, "@") {
+		return raw
+	}
+
+	bs := goutils.ReadFile(string(raw[1:]))
+	// fmt.Printf("%s", bs)
+	str := goutils.ToString(bs)
+	// fmt.Println(string(raw[1:]), str)
+	ret := strings.Replace(str, "\n", "", -1)
+	ret = fmt.Sprintf(`{"data":[%s"0"]}`, ret)
+	// fmt.Printf("decode:%s ==> %s", raw, ret)
+	return ret
+}
+
 func Decode(raw string, prebs []byte) ([]string, string) {
 	if raw == "" {
 		return []string{""}, ""
 	}
+	// raw = DecodeDataFile(raw)
 	ret := raw
 	js := jsnm.BytesFmt(prebs)
+	// log.Infof("raw:%+v %s, %+v", raw, prebs, js.RawData().Raw())
 	allpaths := subDecode(raw, true)
+	// log.Infof("allpaths:%+v", allpaths)
 	if len(allpaths) == 1 && allpaths[0] == "" {
 		return []string{strings.Replace(raw, `"@"`, goutils.ToString(prebs), 1)}, allpaths[0]
 	}
@@ -118,6 +143,8 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 		}
 		rawArrGet := js.ArrGet(rangePaths.prefixPaths...)
 		val := rawArrGet.RawData().Raw()
+		// log.Infof("data:%+v, %+v", rangePaths.prefixPaths, js.RawData().Raw())
+		// log.Infof("path:%s, val:%+v", it, val)
 		if val == nil {
 			continue
 		}
@@ -148,6 +175,25 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			to := int32(arr[1].MustFloat64())
 			ret := make([]string, 0, int(to-from))
 			for i := from; i < to; i++ {
+				ret = append(ret, strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf("%d", i), 1))
+			}
+			return ret, it
+		}
+		if rangePaths.slice {
+			arr := rawArrGet.Arr()
+			retsize := len(arr)
+			if retsize < 3 {
+				return []string{}, ""
+			}
+			from := int32(arr[0].MustFloat64())
+			step_ := int32(arr[1].MustFloat64())
+			if step_ == 0 {
+				return []string{}, ""
+			}
+			to := int32(arr[2].MustFloat64())
+			size := int(to - from)
+			ret := make([]string, 0, size)
+			for i := from; i < to; i += step_ {
 				ret = append(ret, strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf("%d", i), 1))
 			}
 			return ret, it
@@ -233,6 +279,11 @@ func value(v interface{}) (string, string) {
 	case string:
 		return fmt.Sprint(v), "string"
 	default:
+		vv := fmt.Sprint(v)
+		vv = strings.Replace(vv, " ", `","`, -1)
+		vv = strings.Replace(vv, `[`, `["`, -1)
+		vv = strings.Replace(vv, `,"0`, ``, -1)
+		return vv, "slice"
 		log.Infof("%+v value unsupported!", typ)
 	}
 	return "", "unsupport"
