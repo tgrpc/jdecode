@@ -181,21 +181,34 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 		}
 		if rangePaths.slice {
 			arr := rawArrGet.Arr()
-			retsize := len(arr)
-			if retsize < 3 {
+			size := len(arr)
+			if size <= 0 {
 				return []string{}, ""
 			}
-			from := int32(arr[0].MustFloat64())
-			step_ := int32(arr[1].MustFloat64())
-			if step_ == 0 {
-				return []string{}, ""
+			N := 10
+			remainder := 0 // 没有没整除的部分
+			if size%N > 0 {
+				remainder = 1
 			}
-			to := int32(arr[2].MustFloat64())
-			size := int(to - from)
+			loop := size/N + remainder // 总共切片切次
+
 			ret := make([]string, 0, size)
-			for i := from; i < to; i += step_ {
-				ret = append(ret, strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf("%d", i), 1))
+			ain := make([]string, N)
+			for idx := 0; idx < loop-1; idx++ {
+				tmp := arr[idx*N : (idx+1)*N]
+				for i, a := range tmp {
+					ain[i] = fmt.Sprintf(`"%d"`, int64(a.MustFloat64()))
+				}
+				ret = append(ret, getContextByString(raw, it, strings.Join(ain, ",")))
 			}
+
+			ain1 := make([]string, 0, size)
+			tmp := arr[(loop-1)*N:]
+			for _, a := range tmp {
+				ain1 = append(ain1, fmt.Sprintf(`"%d"`, int64(a.MustFloat64())))
+			}
+			ret = append(ret, getContextByString(raw, it, strings.Join(ain1, ",")))
+
 			return ret, it
 		}
 		vv, typ := value(val)
@@ -207,6 +220,14 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 		}
 	}
 	return []string{ret}, ""
+}
+
+func getContext(raw, _path string, i int64) string {
+	return strings.Replace(raw, fmt.Sprintf(`"@%s"`, _path), fmt.Sprintf("%d", i), 1)
+}
+
+func getContextByString(raw, _path string, str string) string {
+	return strings.Replace(raw, fmt.Sprintf(`"@%s"`, _path), str, 1)
 }
 
 func subDecode(raw interface{}, first bool) []string {
