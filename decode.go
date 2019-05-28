@@ -115,8 +115,8 @@ func DecodeDataFile(raw string) string {
 	// fmt.Printf("%s", bs)
 	str := goutils.ToString(bs)
 	// fmt.Println(string(raw[1:]), str)
-	ret := strings.Replace(str, "\n", "", -1)
-	ret = fmt.Sprintf(`{"data":[%s"0"]}`, ret)
+	ret := strings.Replace(str, "\n", ",", -1)
+	ret = fmt.Sprintf(`{"data":[%s]}`, ret)
 	// fmt.Printf("decode:%s ==> %s", raw, ret)
 	return ret
 }
@@ -197,7 +197,7 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			for idx := 0; idx < loop-1; idx++ {
 				tmp := arr[idx*N : (idx+1)*N]
 				for i, a := range tmp {
-					ain[i] = fmt.Sprintf(`"%d"`, int64(a.MustFloat64()))
+					ain[i] = fmt.Sprintf(`"%s"`, a.Decode())
 				}
 				ret = append(ret, getContextByString(raw, it, strings.Join(ain, ",")))
 			}
@@ -205,7 +205,7 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			ain1 := make([]string, 0, size)
 			tmp := arr[(loop-1)*N:]
 			for _, a := range tmp {
-				ain1 = append(ain1, fmt.Sprintf(`"%d"`, int64(a.MustFloat64())))
+				ain1 = append(ain1, fmt.Sprintf(`"%s"`, a.Decode()))
 			}
 			ret = append(ret, getContextByString(raw, it, strings.Join(ain1, ",")))
 
