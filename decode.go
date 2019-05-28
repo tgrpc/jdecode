@@ -121,6 +121,140 @@ func DecodeDataFile(raw string) string {
 	return ret
 }
 
+func DecodeByChan(raw string, prebs []byte, ivkData chan string, dataEnd chan bool) ([]string, string) {
+	go func() {
+		fmt.Println("DecodeByChan go..")
+		defer func() {
+			fmt.Println("close chan")
+			// close(ivkData)
+		}()
+		fmt.Println("DecodeByChan start...")
+		if raw == "" {
+			ivkData <- ""
+			// return []string{""}, ""
+			dataEnd <- true
+			return
+		}
+		// raw = DecodeDataFile(raw)
+		ret := raw
+		js := jsnm.BytesFmt(prebs)
+		// log.Infof("raw:%+v %s, %+v", raw, prebs, js.RawData().Raw())
+		allpaths := subDecode(raw, true)
+		// log.Infof("allpaths:%+v", allpaths)
+		if len(allpaths) == 1 && allpaths[0] == "" {
+			ivkData <- strings.Replace(raw, `"@"`, goutils.ToString(prebs), 1)
+			// return []string{strings.Replace(raw, `"@"`, goutils.ToString(prebs), 1)}, allpaths[0]
+			dataEnd <- true
+			return
+		}
+		for _, it := range allpaths {
+			rawpaths := strings.Split(it, ",")
+			rangePaths := TrimPath(rawpaths)
+			size := len(rawpaths)
+			if size <= 0 {
+				continue
+			}
+			rawArrGet := js.ArrGet(rangePaths.prefixPaths...)
+			val := rawArrGet.RawData().Raw()
+			// log.Infof("data:%+v, %+v", rangePaths.prefixPaths, js.RawData().Raw())
+			// log.Infof("path:%s, val:%+v", it, val)
+			if val == nil {
+				continue
+			}
+			if rangePaths.ranged {
+				arr := rawArrGet.Arr()
+				retsize := len(arr)
+				ret := make([]string, retsize)
+				for i, item := range arr {
+					var v string
+					bs, err := jsonen(item.ArrGet(rangePaths.suffixPaths...).RawData().Raw())
+					if err == nil {
+						v = string(bs)
+					} else {
+						v = fmt.Sprint(item.ArrGet(rangePaths.suffixPaths...).RawData().Raw())
+					}
+
+					ivkData <- strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), v, 1)
+					ret[i] = strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), v, 1)
+				}
+				// return ret, it
+				dataEnd <- true
+				return
+			}
+			if rangePaths.step {
+				arr := rawArrGet.Arr()
+				retsize := len(arr)
+				if retsize < 2 {
+					// return []string{}, ""
+					dataEnd <- true
+					return
+				}
+				from := int32(arr[0].MustFloat64())
+				to := int32(arr[1].MustFloat64())
+				ret := make([]string, 0, int(to-from))
+				for i := from; i < to; i++ {
+					ivkData <- strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf("%d", i), 1)
+					ret = append(ret, strings.Replace(raw, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf("%d", i), 1))
+				}
+				// return ret, it
+				dataEnd <- true
+				return
+			}
+			if rangePaths.slice {
+				arr := rawArrGet.Arr()
+				size := len(arr)
+				if size <= 0 {
+					// return []string{}, ""
+					dataEnd <- true
+					return
+				}
+				N := 10
+				remainder := 0 // 没有没整除的部分
+				if size%N > 0 {
+					remainder = 1
+				}
+				loop := size/N + remainder // 总共切片切次
+
+				ret := make([]string, 0, size)
+				ain := make([]string, N)
+				for idx := 0; idx < loop-1; idx++ {
+					tmp := arr[idx*N : (idx+1)*N]
+					for i, a := range tmp {
+						ain[i] = fmt.Sprintf(`"%s"`, a.Decode())
+					}
+					ivkData <- getContextByString(raw, it, strings.Join(ain, ","))
+					ret = append(ret, getContextByString(raw, it, strings.Join(ain, ",")))
+				}
+
+				ain1 := make([]string, 0, size)
+				tmp := arr[(loop-1)*N:]
+				for _, a := range tmp {
+					ain1 = append(ain1, fmt.Sprintf(`"%s"`, a.Decode()))
+				}
+				ivkData <- getContextByString(raw, it, strings.Join(ain1, ","))
+				ret = append(ret, getContextByString(raw, it, strings.Join(ain1, ",")))
+
+				// return ret, it
+				dataEnd <- true
+				return
+			}
+			vv, typ := value(val)
+			if vv != "" {
+				if typ != "string" && strings.Contains(ret, fmt.Sprintf(`"@%s"`, it)) {
+					ret = strings.Replace(ret, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf(`%s`, vv), -1)
+				}
+				ret = strings.Replace(ret, fmt.Sprintf(`"@%s`, it), fmt.Sprintf(`"%s`, vv), -1)
+			}
+		}
+		ivkData <- ret
+		// return []string{ret}, ""
+		dataEnd <- true
+		return
+
+	}()
+	return []string{""}, ""
+}
+
 func Decode(raw string, prebs []byte) ([]string, string) {
 	if raw == "" {
 		return []string{""}, ""
