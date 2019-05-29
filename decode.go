@@ -112,10 +112,19 @@ func DecodeDataFile(raw string) string {
 	}
 
 	bs := goutils.ReadFile(string(raw[1:]))
-	// fmt.Printf("%s", bs)
 	str := goutils.ToString(bs)
-	// fmt.Println(string(raw[1:]), str)
-	ret := strings.Replace(str, "\n", ",", -1)
+
+	var ret string
+	if string(bs[0]) == `"` {
+		ret = strings.Replace(str, "\n", ",", -1)
+	} else {
+		as := strings.Split(str, "\n")
+		for i, _ := range as {
+			as[i] = fmt.Sprintf(`"%s"`, as[i])
+		}
+		ret = strings.Join(as, ",")
+	}
+
 	ret = fmt.Sprintf(`{"$file":[%s]}`, ret)
 	// fmt.Printf("decode:%s ==> %s", raw, ret)
 	return ret
