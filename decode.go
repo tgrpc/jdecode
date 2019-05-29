@@ -116,19 +116,13 @@ func DecodeDataFile(raw string) string {
 	str := goutils.ToString(bs)
 	// fmt.Println(string(raw[1:]), str)
 	ret := strings.Replace(str, "\n", ",", -1)
-	ret = fmt.Sprintf(`{"data":[%s]}`, ret)
+	ret = fmt.Sprintf(`{"$file":[%s]}`, ret)
 	// fmt.Printf("decode:%s ==> %s", raw, ret)
 	return ret
 }
 
 func DecodeByChan(raw string, prebs []byte, ivkData chan string, dataEnd chan bool) ([]string, string) {
 	go func() {
-		fmt.Println("DecodeByChan go..")
-		defer func() {
-			fmt.Println("close chan")
-			// close(ivkData)
-		}()
-		fmt.Println("DecodeByChan start...")
 		if raw == "" {
 			ivkData <- ""
 			// return []string{""}, ""
