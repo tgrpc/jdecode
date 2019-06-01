@@ -211,7 +211,7 @@ func DecodeByChan(raw string, prebs []byte, ivkData chan string, dataEnd chan bo
 					dataEnd <- true
 					return
 				}
-				N := 10
+				N := 100
 				remainder := 0 // 没有没整除的部分
 				if size%N > 0 {
 					remainder = 1
