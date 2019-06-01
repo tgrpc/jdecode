@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/sirupsen/logrus"
+	"github.com/tealeg/xlsx"
 	"github.com/toukii/goutils"
 	"github.com/toukii/jsnm"
 )
@@ -110,6 +111,9 @@ func DecodeDataFile(raw string) string {
 	if !strings.HasPrefix(raw, "@") {
 		return raw
 	}
+	if strings.HasSuffix(raw, ".xlsx") {
+		return DecodeDataExcelFile(string(raw[1:]))
+	}
 
 	bs := goutils.ReadFile(string(raw[1:]))
 	str := goutils.ToString(bs)
@@ -125,6 +129,39 @@ func DecodeDataFile(raw string) string {
 		ret = strings.Join(as, ",")
 	}
 
+	ret = fmt.Sprintf(`{"$file":[%s]}`, ret)
+	// fmt.Printf("decode:%s ==> %s", raw, ret)
+	return ret
+}
+
+func DecodeDataExcelFile(filename string) string {
+	log.Infof("DecodeDataExcelFile %s ...", filename)
+	excel, err := xlsx.OpenFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	cotxt := make([]string, 0, 1024)
+	for i, sh := range excel.Sheets {
+		log.Infof("DecodeDataExcelFile %s sheet %d ...", filename, i)
+		for j, r := range sh.Rows {
+			if j%1000 == 0 {
+				fmt.Printf("%d ", j)
+			}
+			if len(r.Cells) <= 0 {
+				continue
+			}
+			if string(r.Cells[0].Value[0]) == `"` {
+				cotxt = append(cotxt, r.Cells[0].Value)
+			} else {
+				cotxt = append(cotxt, fmt.Sprintf(`"%s"`, r.Cells[0].Value))
+			}
+		}
+	}
+	if len(cotxt) <= 0 {
+		return ""
+	}
+
+	ret := strings.Join(cotxt, ",")
 	ret = fmt.Sprintf(`{"$file":[%s]}`, ret)
 	// fmt.Printf("decode:%s ==> %s", raw, ret)
 	return ret
