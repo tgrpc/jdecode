@@ -23,6 +23,7 @@ var (
 	ranger  = "$range"
 	step    = "$step"
 	slice   = "$slice"
+	this    = "$this"
 
 	log *logrus.Entry
 )
@@ -49,6 +50,7 @@ func jsonen(i interface{}) ([]byte, error) {
 type RangePath struct {
 	prefixPaths, suffixPaths []string
 	ranged, step, slice      bool // 是否循环, 是否range-step, slice切片
+	this                     bool
 }
 
 func TrimPath(paths []string) RangePath {
@@ -79,6 +81,12 @@ func TrimPath(paths []string) RangePath {
 				prefixPaths: ret[:i],
 				suffixPaths: ret[i+1:],
 				slice:       true,
+			}
+		} else if it == this {
+			return RangePath{
+				prefixPaths: ret[:i],
+				suffixPaths: ret[i+1:],
+				this:        true,
 			}
 		}
 	}
@@ -144,7 +152,7 @@ func DecodeDataExcelFile(filename string) string {
 	for i, sh := range excel.Sheets {
 		log.Infof("DecodeDataExcelFile %s sheet %d ...", filename, i)
 		for j, r := range sh.Rows {
-			if j%2 == 0 {
+			if j%1000 == 0 {
 				fmt.Printf("%d ", j)
 			}
 			if len(r.Cells) <= 0 {
@@ -248,7 +256,7 @@ func DecodeByChan(raw string, prebs []byte, ivkData chan string, dataEnd chan bo
 					dataEnd <- true
 					return
 				}
-				N := 2
+				N := 100
 				remainder := 0 // 没有没整除的部分
 				if size%N > 0 {
 					remainder = 1
@@ -277,6 +285,9 @@ func DecodeByChan(raw string, prebs []byte, ivkData chan string, dataEnd chan bo
 				// return ret, it
 				dataEnd <- true
 				return
+			}
+			if rangePaths.this {
+				// return
 			}
 			vv, typ := value(val)
 			if vv != "" {
@@ -386,6 +397,11 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			return ret, it
 		}
 		vv, typ := value(val)
+		fmt.Println(rangePaths, vv)
+		fmt.Println(val)
+		if rangePaths.this {
+			return []string{strings.Replace(ret, fmt.Sprintf(`"@%s"`, this), fmt.Sprintf(`%s`, vv), -1)}, ""
+		}
 		if vv != "" {
 			if typ != "string" && strings.Contains(ret, fmt.Sprintf(`"@%s"`, it)) {
 				ret = strings.Replace(ret, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf(`%s`, vv), -1)
@@ -477,6 +493,7 @@ func value(v interface{}) (string, string) {
 		vv := fmt.Sprint(v)
 		vv = strings.Replace(vv, " ", `","`, -1)
 		vv = strings.Replace(vv, `[`, `["`, -1)
+		vv = strings.Replace(vv, `]`, `"]`, -1)
 		vv = strings.Replace(vv, `,"0`, ``, -1)
 		return vv, "slice"
 		log.Infof("%+v value unsupported!", typ)

@@ -317,6 +317,29 @@ func TestDecodeSlice(t *testing.T) {
 	})
 }
 
+func TestDecodeThis(t *testing.T) {
+	t.Run("Decode $this", func(t *testing.T) {
+		tcases := []testcase{
+			{
+				raw: `{"name":"@$this"}`,
+				bs:  []byte(`[3,2,6]`),
+				des: []string{`{"name":["3","2","6"]}`},
+			},
+		}
+		size := len(tcases)
+		for i := 0; i < size; i++ {
+			des, _ := Decode(tcases[i].raw, tcases[i].bs)
+			if !reflect.DeepEqual(des, tcases[i].des) {
+				t.Errorf("decode: %s, want: %s, got: %s", tcases[i].raw, tcases[i].des, des)
+			} else {
+				for j, it := range des {
+					log.Debugf("%d decode, raw: %s bs: %s ==> %s", j, tcases[i].raw, tcases[i].bs, it)
+				}
+			}
+		}
+	})
+}
+
 func TestGetLetterStr(t *testing.T) {
 	t.Run("getLetterStr", func(t *testing.T) {
 		ts := [][2]string{
