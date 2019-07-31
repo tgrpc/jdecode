@@ -144,7 +144,7 @@ func DecodeDataExcelFile(filename string) string {
 	for i, sh := range excel.Sheets {
 		log.Infof("DecodeDataExcelFile %s sheet %d ...", filename, i)
 		for j, r := range sh.Rows {
-			if j%1000 == 0 {
+			if j%2 == 0 {
 				fmt.Printf("%d ", j)
 			}
 			if len(r.Cells) <= 0 {
@@ -248,7 +248,7 @@ func DecodeByChan(raw string, prebs []byte, ivkData chan string, dataEnd chan bo
 					dataEnd <- true
 					return
 				}
-				N := 100
+				N := 2
 				remainder := 0 // 没有没整除的部分
 				if size%N > 0 {
 					remainder = 1
@@ -359,7 +359,7 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			if size <= 0 {
 				return []string{}, ""
 			}
-			N := 10
+			N := 2
 			remainder := 0 // 没有没整除的部分
 			if size%N > 0 {
 				remainder = 1

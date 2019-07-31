@@ -298,9 +298,9 @@ func TestDecodeSlice(t *testing.T) {
 	t.Run("Decode $slice", func(t *testing.T) {
 		tcases := []testcase{
 			{
-				raw: `{"name":"@$slice"}`,
+				raw: `{"name":["@$slice"]}`,
 				bs:  []byte(`[3,2,6]`),
-				des: []string{`{"name":3}`, `{"name":5}`},
+				des: []string{`{"name":["3","2"]}`, `{"name":["6"]}`},
 			},
 		}
 		size := len(tcases)
