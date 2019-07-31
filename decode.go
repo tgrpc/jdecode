@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/sirupsen/logrus"
+	"github.com/tealeg/xlsx"
 	"github.com/toukii/goutils"
 	"github.com/toukii/jsnm"
 )
@@ -22,6 +23,7 @@ var (
 	ranger  = "$range"
 	step    = "$step"
 	slice   = "$slice"
+	this    = "$this"
 
 	log *logrus.Entry
 )
@@ -48,6 +50,7 @@ func jsonen(i interface{}) ([]byte, error) {
 type RangePath struct {
 	prefixPaths, suffixPaths []string
 	ranged, step, slice      bool // 是否循环, 是否range-step, slice切片
+	this                     bool
 }
 
 func TrimPath(paths []string) RangePath {
@@ -78,6 +81,12 @@ func TrimPath(paths []string) RangePath {
 				prefixPaths: ret[:i],
 				suffixPaths: ret[i+1:],
 				slice:       true,
+			}
+		} else if it == this {
+			return RangePath{
+				prefixPaths: ret[:i],
+				suffixPaths: ret[i+1:],
+				this:        true,
 			}
 		}
 	}
@@ -110,6 +119,9 @@ func DecodeDataFile(raw string) string {
 	if !strings.HasPrefix(raw, "@") {
 		return raw
 	}
+	if strings.HasSuffix(raw, ".xlsx") {
+		return DecodeDataExcelFile(string(raw[1:]))
+	}
 
 	bs := goutils.ReadFile(string(raw[1:]))
 	str := goutils.ToString(bs)
@@ -125,6 +137,39 @@ func DecodeDataFile(raw string) string {
 		ret = strings.Join(as, ",")
 	}
 
+	ret = fmt.Sprintf(`{"$file":[%s]}`, ret)
+	// fmt.Printf("decode:%s ==> %s", raw, ret)
+	return ret
+}
+
+func DecodeDataExcelFile(filename string) string {
+	log.Infof("DecodeDataExcelFile %s ...", filename)
+	excel, err := xlsx.OpenFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	cotxt := make([]string, 0, 1024)
+	for i, sh := range excel.Sheets {
+		log.Infof("DecodeDataExcelFile %s sheet %d ...", filename, i)
+		for j, r := range sh.Rows {
+			if j%1000 == 0 {
+				fmt.Printf("%d ", j)
+			}
+			if len(r.Cells) <= 0 {
+				continue
+			}
+			if string(r.Cells[0].Value[0]) == `"` {
+				cotxt = append(cotxt, r.Cells[0].Value)
+			} else {
+				cotxt = append(cotxt, fmt.Sprintf(`"%s"`, r.Cells[0].Value))
+			}
+		}
+	}
+	if len(cotxt) <= 0 {
+		return ""
+	}
+
+	ret := strings.Join(cotxt, ",")
 	ret = fmt.Sprintf(`{"$file":[%s]}`, ret)
 	// fmt.Printf("decode:%s ==> %s", raw, ret)
 	return ret
@@ -241,6 +286,9 @@ func DecodeByChan(raw string, prebs []byte, ivkData chan string, dataEnd chan bo
 				dataEnd <- true
 				return
 			}
+			if rangePaths.this {
+				// return
+			}
 			vv, typ := value(val)
 			if vv != "" {
 				if typ != "string" && strings.Contains(ret, fmt.Sprintf(`"@%s"`, it)) {
@@ -322,7 +370,7 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			if size <= 0 {
 				return []string{}, ""
 			}
-			N := 10
+			N := 2
 			remainder := 0 // 没有没整除的部分
 			if size%N > 0 {
 				remainder = 1
@@ -349,6 +397,11 @@ func Decode(raw string, prebs []byte) ([]string, string) {
 			return ret, it
 		}
 		vv, typ := value(val)
+		fmt.Println(rangePaths, vv)
+		fmt.Println(val)
+		if rangePaths.this {
+			return []string{strings.Replace(ret, fmt.Sprintf(`"@%s"`, this), fmt.Sprintf(`%s`, vv), -1)}, ""
+		}
 		if vv != "" {
 			if typ != "string" && strings.Contains(ret, fmt.Sprintf(`"@%s"`, it)) {
 				ret = strings.Replace(ret, fmt.Sprintf(`"@%s"`, it), fmt.Sprintf(`%s`, vv), -1)
@@ -440,6 +493,7 @@ func value(v interface{}) (string, string) {
 		vv := fmt.Sprint(v)
 		vv = strings.Replace(vv, " ", `","`, -1)
 		vv = strings.Replace(vv, `[`, `["`, -1)
+		vv = strings.Replace(vv, `]`, `"]`, -1)
 		vv = strings.Replace(vv, `,"0`, ``, -1)
 		return vv, "slice"
 		log.Infof("%+v value unsupported!", typ)
